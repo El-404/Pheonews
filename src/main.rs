@@ -8,7 +8,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let subject = &args[1];
 
-    let (channel, _) = get_google_subject(subject).await?;
+    let (channel, _) = get_google_channel(subject).await?;
 
     let mut article_html: String;
     loop {
@@ -23,13 +23,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         if article_status == reqwest::StatusCode::OK { break; }
     }
-    // std::fs::write("output.html", &article_html)?;
 
     let document = Html::parse_document(&article_html);
 
     let article_selector = Selector::parse("article").unwrap();
     let article_element = document.select(&article_selector).next();
-    let article: String = match(article_element) {
+    let article: String = match article_element {
         Some(element) => element.inner_html(),
         None => article_html
     };
@@ -39,7 +38,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn get_google_subject(subject: &str) -> Result<(Channel, reqwest::StatusCode), Box<dyn Error>> {
+async fn get_google_channel(subject: &str) -> Result<(Channel, reqwest::StatusCode), Box<dyn Error>> {
     return get_url_channel(&format!("https://news.google.com/rss?q={}&hl=en-US&gl=US&ceid=US%3Aen", subject)).await;
 }
 
