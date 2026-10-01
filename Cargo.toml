@@ -10,3 +10,4 @@ rss = "2.0.0"
 reqwest = "0.13.0"
 open = "5.4.4"
 rand = "0.10.3"
+google-news-url-decoder-rs = { path = "./google-news-url-decoder-rs" }
