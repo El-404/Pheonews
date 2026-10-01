@@ -1,13 +1,12 @@
 use std::error::Error;
 use rss::Channel;
-use std::{env,fs::File};
-// use mini_redis::{client, Result};
+use std::env;
 
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
     let subject = &args[1];
-    let feed = getGoogleSubject(subject).await;
+    let feed = get_google_subject(subject).await;
 
     if feed.is_err() {
         println!("Error fetching feed: {}", feed.unwrap_err());
@@ -23,11 +22,11 @@ async fn main() {
     }
 }
 
-async fn getGoogleSubject(subject: &str) -> Result<Channel, Box<dyn Error>> {
-    return getRss(&format!("https://news.google.com/rss?q={}&hl=en-US&gl=US&ceid=US%3Aen", subject)).await;
+async fn get_google_subject(subject: &str) -> Result<Channel, Box<dyn Error>> {
+    return get_rss(&format!("https://news.google.com/rss?q={}&hl=en-US&gl=US&ceid=US%3Aen", subject)).await;
 }
 
-async fn getRss(url: &str) -> Result<Channel, Box<dyn Error>> {
+async fn get_rss(url: &str) -> Result<Channel, Box<dyn Error>> {
 let content = reqwest::get(url)
     .await?
     .bytes()
