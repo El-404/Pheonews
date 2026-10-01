@@ -24,16 +24,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if article_status == reqwest::StatusCode::OK { break; }
     }
 
-    let document = Html::parse_document(&article_html);
+    // let document = Html::parse_document(&article_html);
 
-    let article_selector = Selector::parse("article").unwrap();
-    let article_element = document.select(&article_selector).next();
-    let article: String = match article_element {
-        Some(element) => element.inner_html(),
-        None => article_html
-    };
+    // let article_selector = Selector::parse("article").unwrap();
+    // let article_element = document.select(&article_selector).next();
+    // let article: String = match article_element {
+        // Some(element) => element.inner_html(),
+        // None => article_html
+    // };
     
-    std::fs::write("output.html", article)?;
+    std::fs::write("output.html", article_html)?;
 
     Ok(())
 }
