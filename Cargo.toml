@@ -1,0 +1,12 @@
+[package]
+name = "Pheonews"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+tokio = {version = "1.53.1", features = ["full"]}
+simple-summarize = "0.2.1"
+rss = "2.0.0"
+reqwest = "0.13.0"
+open = "5.4.4"
+rand = "0.10.3"
