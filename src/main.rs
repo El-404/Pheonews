@@ -1,46 +1,57 @@
 use std::error::Error;
 use rss::Channel;
 use std::env;
+use scraper::{Html, Selector};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
     let subject = &args[1];
-    let channel = get_google_subject(subject).await?;
+
+    let (channel, _) = get_google_subject(subject).await?;
+
+    let mut article_html: String;
+    loop {
+        let mut rng = rand::random::<f64>();
+        rng *= channel.items().len() as f64;
+        let url = channel.items[rng as usize].link().unwrap();
+
+        let publisher_url = google_news_url_decoder_rs::decode_google_news_url(url).await?;
+
+        let article_status: reqwest::StatusCode;
+        (article_html, article_status) = get_url_content(&publisher_url).await?;
+
+        if article_status == reqwest::StatusCode::OK { break; }
+    }
+    // std::fs::write("output.html", &article_html)?;
+
+    let document = Html::parse_document(&article_html);
+
+    let article_selector = Selector::parse("article").unwrap();
+    let article_element = document.select(&article_selector).next();
+    let article: String = match(article_element) {
+        Some(element) => element.inner_html(),
+        None => article_html
+    };
     
-    let mut rng = rand::random::<f64>();
-    rng *= channel.items().len() as f64;
-    let url = channel.items[rng as usize].link().unwrap();
-
-    // open::that(url)?;
-
-    let publisher_url = google_news_url_decoder_rs::decode_google_news_url(url).await?;
-    println!("{}", publisher_url);
-    let _ = std::fs::write("output.html", get_rss_content(&publisher_url).await?);
-
+    std::fs::write("output.html", article)?;
 
     Ok(())
 }
 
-async fn get_google_subject(subject: &str) -> Result<Channel, Box<dyn Error>> {
-    return get_rss_channel(&format!("https://news.google.com/rss?q={}&hl=en-US&gl=US&ceid=US%3Aen", subject)).await;
+async fn get_google_subject(subject: &str) -> Result<(Channel, reqwest::StatusCode), Box<dyn Error>> {
+    return get_url_channel(&format!("https://news.google.com/rss?q={}&hl=en-US&gl=US&ceid=US%3Aen", subject)).await;
 }
 
-async fn get_rss_channel(url: &str) -> Result<Channel, Box<dyn Error>> {
-    let content = reqwest::get(url)
-        .await?
-        .bytes()
-        .await?;
-
-    let channel = Channel::read_from(&content[..])?;
-    Ok(channel)
+async fn get_url_channel(url: &str) -> Result<(Channel, reqwest::StatusCode), Box<dyn Error>> {
+    let (content, status) = get_url_content(url).await?;
+    let channel = content.parse::<Channel>()?;
+    Ok((channel, status))
 }
 
-async fn get_rss_content(url: &str) -> Result<String, Box<dyn Error>> {
-    let content = reqwest::get(url)
-        .await?
-        .text()
-        .await?;
+async fn get_url_content(url: &str) -> Result<(String, reqwest::StatusCode), Box<dyn Error>> {
+    let content = reqwest::get(url).await?;
+    let status = content.status();
 
-    Ok(content)
+    Ok((content.text().await?, status))
 }
