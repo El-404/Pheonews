@@ -5,7 +5,13 @@ use std::env;
 
 #[derive(serde::Deserialize)]
 struct GeneratedResponse {
-  response: String
+    done: bool,
+    model: String,
+    created_at: String,
+    done_reason: String,
+    response: String,
+    total_duration: u32,
+    load_duration: u32
 }
 
 #[tokio::main]
@@ -29,15 +35,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if article_status == reqwest::StatusCode::OK { break; }
     }
     
-    std::fs::write("input.html", &article_html)?;
-    let out = summarize(&article_html).await?;
+    let document = scraper::Html::parse_document(&article_html);
+    let main_text = document.root_element().text().collect::<Vec<_>>().join(" ");
+    // std::fs::write("input.html", &article_html)?;
+    let out = summarize(&main_text).await?;
 
-    let json = out.json::<GeneratedResponse>().await?;
+    // let json = out.json::<GeneratedResponse>().await?;
+
     // println!("Model: {}", json.model);
     // println!("Created at: {}", json.created_at);
     // println!("Response: {}", json.response);
+    // std::fs::write("output.md", json.response)?;
+    let json = out.json::<GeneratedResponse>().await?;
+    println!("{}", json.done);
     std::fs::write("output.md", json.response)?;
-    // std::fs::write("output.md", out.text().await?)?;
 
     Ok(())
 }
@@ -66,21 +77,8 @@ async fn summarize(text: &str) -> Result<Response, Box<dyn Error>> {
 
     let request = serde_json::json!({
         "model": "summarizer3",
-        "prompt": sys_prompt + text,
-        "stream": false,
-        // "format": {
-            // "Title": "string",
-            // "properties": {
-                // "paragraph": {
-                    // "markdown": "string"
-                // },
-                // "biases": "string"
-            // },
-            // "required": ["paragraph", "biases"]
-        // },
-        "options": {
-          "num_ctx": 32768
-        }
+        "prompt": format!("{sys_prompt}\n\nBEGIN ARTICLE HTML\n{text}\nEND ARTICLE HTML"),
+        "stream": false
     });
 
     let request = client
