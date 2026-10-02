@@ -1,7 +1,6 @@
-use std::error::Error;
+use std::{error::Error, process::Output};
 use rss::Channel;
 use std::env;
-use scraper::{Html, Selector};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -23,17 +22,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         if article_status == reqwest::StatusCode::OK { break; }
     }
-
-    // let document = Html::parse_document(&article_html);
-
-    // let article_selector = Selector::parse("article").unwrap();
-    // let article_element = document.select(&article_selector).next();
-    // let article: String = match article_element {
-        // Some(element) => element.inner_html(),
-        // None => article_html
-    // };
     
-    std::fs::write("output.html", article_html)?;
+    std::fs::write("/tmp/input.html", &article_html)?;
+    let out = summarize()?;
+    print!("{}", String::from_utf8_lossy(&out.stdout));
 
     Ok(())
 }
@@ -53,4 +45,9 @@ async fn get_url_content(url: &str) -> Result<(String, reqwest::StatusCode), Box
     let status = content.status();
 
     Ok((content.text().await?, status))
+}
+
+
+fn summarize() -> Result<Output, std::io::Error> {
+    std::process::Command::new("./runLLM.sh").output()
 }
