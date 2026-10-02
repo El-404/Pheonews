@@ -13,7 +13,7 @@ Pheonews is a news fetcher and summarizer that collects articles using google ne
 - [Ollama](https://ollama.com/)
     - Pheonews uses an Ollama agent to summarize the parsed article
     - Install a model and rename it summarizer
-    - Host the model on localhost:11434
+    - Serve the model on localhost:11434
 
 - [google-news-url-decoder-rs](https://github.com/El-404/google-news-url-decoder-rs)
     - Converts google news links into the links for their respective article
@@ -24,6 +24,6 @@ Pheonews is a news fetcher and summarizer that collects articles using google ne
 
 ## Usage
 
-To fetch a random article based around <subject> use the command
+To fetch a random article based on a <subject> use the command
 
 ```cargo run <subject>```
