@@ -1,4 +1,0 @@
-Summarize the article provided by the user.
-Start by describing its overall theme and topics.
-Then concisely summarize the important details.
-End by identifying possible biases.

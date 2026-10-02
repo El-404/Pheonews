@@ -1,4 +1,5 @@
 use std::{error::Error, process::Output};
+use reqwest::Response;
 use rss::Channel;
 use std::env;
 
@@ -23,9 +24,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if article_status == reqwest::StatusCode::OK { break; }
     }
     
-    std::fs::write("/tmp/input.html", &article_html)?;
-    let out = summarize()?;
-    print!("{}", String::from_utf8_lossy(&out.stdout));
+    // std::fs::write("/tmp/input.html", &article_html)?;
+    let out = summarize(&article_html).await?;
+    std::fs::write("output.md", out.text().await?)?;
 
     Ok(())
 }
@@ -48,6 +49,24 @@ async fn get_url_content(url: &str) -> Result<(String, reqwest::StatusCode), Box
 }
 
 
-fn summarize() -> Result<Output, std::io::Error> {
-    std::process::Command::new("./runLLM.sh").output()
+async fn summarize(text: &str) -> Result<Response, Box<dyn Error>> {
+    let sys_prompt = std::fs::read_to_string("sysPrompt.txt")?;
+    let client = reqwest::Client::new();
+
+    let request = serde_json::json!({
+        "model": "summarizer",
+        "prompt": text,
+        "system": sys_prompt,
+        "stream": false,
+        // "think": true,
+        "format": "json",
+    });
+
+    let request = client
+        .post("http://localhost:11434/api/generate")
+        .json(&request)
+        .build()?;
+
+    let response = client.execute(request).await?;
+    Ok(response)
 }
