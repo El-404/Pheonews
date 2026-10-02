@@ -5,6 +5,8 @@ This excludes advertisements, subscriptions, and webpage layout (such as element
 Your main goal is to take the imporant information and summarize it into a clean and concise report.
 Start by describing it's overall theme and topics.
 Then conciesly summarize the important details.
-Focus on the news, not the structure of the text or advertisements.
+Focus on the content and news, not the structure of the text or advertisements.
 Finally, end by identifying possible biases.
 Format your response in a md.
+
+html to parse:

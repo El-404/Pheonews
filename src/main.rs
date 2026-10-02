@@ -1,7 +1,12 @@
-use std::{error::Error, process::Output};
+use std::error::Error;
 use reqwest::Response;
 use rss::Channel;
 use std::env;
+
+#[derive(serde::Deserialize)]
+struct GeneratedResponse {
+  response: String
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -24,9 +29,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if article_status == reqwest::StatusCode::OK { break; }
     }
     
-    // std::fs::write("/tmp/input.html", &article_html)?;
+    std::fs::write("input.html", &article_html)?;
     let out = summarize(&article_html).await?;
-    std::fs::write("output.md", out.text().await?)?;
+
+    let json = out.json::<GeneratedResponse>().await?;
+    // println!("Model: {}", json.model);
+    // println!("Created at: {}", json.created_at);
+    // println!("Response: {}", json.response);
+    std::fs::write("output.md", json.response)?;
+    // std::fs::write("output.md", out.text().await?)?;
 
     Ok(())
 }
@@ -54,12 +65,22 @@ async fn summarize(text: &str) -> Result<Response, Box<dyn Error>> {
     let client = reqwest::Client::new();
 
     let request = serde_json::json!({
-        "model": "summarizer",
-        "prompt": text,
-        "system": sys_prompt,
+        "model": "summarizer3",
+        "prompt": sys_prompt + text,
         "stream": false,
-        // "think": true,
-        "format": "json",
+        // "format": {
+            // "Title": "string",
+            // "properties": {
+                // "paragraph": {
+                    // "markdown": "string"
+                // },
+                // "biases": "string"
+            // },
+            // "required": ["paragraph", "biases"]
+        // },
+        "options": {
+          "num_ctx": 32768
+        }
     });
 
     let request = client
