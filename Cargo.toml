@@ -6,10 +6,11 @@ edition = "2024"
 [dependencies]
 tokio = {version = "1.53.1", features = ["full"]}
 rss = "2.0.0"
-reqwest = { version = "0.13.0", features = ["json"] }
+reqwest = { version = "0.13.0", features = ["json", "stream"] }
 open = "5.4.4"
 rand = "0.10.3"
 google-news-url-decoder-rs = { path = "./google-news-url-decoder-rs" }
 scraper = "0.27.0"
 serde_json = "1.0.151"
 serde = { version = "1.0.0", features = ["derive"] }
+futures-util = "0.3"

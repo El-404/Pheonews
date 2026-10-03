@@ -1,29 +1,25 @@
 use std::error::Error;
-use reqwest::Response;
+use reqwest::Client;
 use rss::Channel;
 use std::env;
 
-#[derive(serde::Deserialize)]
-struct GeneratedResponse {
-    done: bool,
-    model: String,
-    created_at: String,
-    done_reason: String,
-    response: String,
-    total_duration: u32,
-    load_duration: u32
-}
+mod summarizer;
 
-async fn get_random_article(subject: &str, verbose: bool) -> String {
+
+async fn get_random_article(subject: &str, verbose: bool, client: &Client) -> String {
     let mut article_html;
     'main_loop: loop {
-        let channel_result = get_google_channel(subject).await;
+        let channel_result = get_google_channel(subject, client).await;
         let (channel, status): (Channel, reqwest::StatusCode);
         match channel_result {
             Ok((channel_inner, status_inner)) => {
                 (channel, status) = (channel_inner, status_inner);
+                if !status.is_success() {
+                    if verbose { println!("Failed to get search result for {}; retrying", subject); }
+                    continue 'main_loop;
+                }
             },
-            Err(e) => { 
+            Err(_e) => { 
                 if verbose { println!("Failed to get search result for {}; retrying", subject); }
                 continue 'main_loop;
             }
@@ -38,24 +34,24 @@ async fn get_random_article(subject: &str, verbose: bool) -> String {
             Ok(publisher_url_inner) => {
                 publisher_url = publisher_url_inner;
             },
-            Err(e) => {
+            Err(_e) => {
                 if verbose { println!("Failed to decode publisher URL for {}\nURL: {}; retrying", subject, url); }
                 continue 'main_loop;
             }
         }
-        let content_result = get_url_content(&publisher_url).await;
+        let content_result = get_url_content(&publisher_url, client).await;
         match content_result {
             Ok((article_html_inner, article_status)) => {
                 article_html = article_html_inner;
                 if article_status.is_success() {
                     break 'main_loop;
                 } else {
-                    if verbose { println!("Failed to get article content for {}\nURL: {}; retrying", subject, publisher_url); }
+                    if verbose { println!("Failed to get article content for {} at:\n{}; retrying", subject, publisher_url); }
                     continue 'main_loop;
                 }
             },
-            Err(e) => {
-                if verbose { println!("Failed to get article content for {}\nURL: {}; retrying", subject, publisher_url); }
+            Err(_e) => {
+                if verbose { println!("Failed to get article content for {} at:\n{}; retrying", subject, publisher_url); }
                 continue 'main_loop;
             }
         }
@@ -66,58 +62,46 @@ async fn get_random_article(subject: &str, verbose: bool) -> String {
 
 fn parse_html(html: &str) -> String {
     let document = scraper::Html::parse_document(html);
-    document.root_element().text().collect::<Vec<_>>().join(" ")
+    let content_selector = scraper::Selector::parse("article, h1, h2, h3, h4, h5, span, p").unwrap();
+
+    let mut text = String::new();
+    for element in document.select(&content_selector) {
+        text += &(element.text().collect::<Vec<_>>().join(" ") + "\n");
+    }
+
+    text
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
-    let subject = &args[1];
-    let verbose = args.len() > 2 && args[2] == "--verbose";
-
-    let article_html = get_random_article(subject, verbose).await;
-    let summarized_response = summarize(&parse_html(&article_html), verbose).await?;
-
-    
-    let json = summarized_response.json::<GeneratedResponse>().await?;
-    std::fs::write("output.md", json.response)?;
-
-    Ok(())
+async fn get_google_channel(subject: &str, client: &Client) -> Result<(Channel, reqwest::StatusCode), Box<dyn Error>> {
+    return get_url_channel(&format!("https://news.google.com/rss?q={}&hl=en-US&gl=US&ceid=US%3Aen", subject), client).await;
 }
 
-async fn get_google_channel(subject: &str) -> Result<(Channel, reqwest::StatusCode), Box<dyn Error>> {
-    return get_url_channel(&format!("https://news.google.com/rss?q={}&hl=en-US&gl=US&ceid=US%3Aen", subject)).await;
-}
-
-async fn get_url_channel(url: &str) -> Result<(Channel, reqwest::StatusCode), Box<dyn Error>> {
-    let (content, status) = get_url_content(url).await?;
+async fn get_url_channel(url: &str, client: &Client) -> Result<(Channel, reqwest::StatusCode), Box<dyn Error>> {
+    let (content, status) = get_url_content(url, client).await?;
     let channel = content.parse::<Channel>()?;
     Ok((channel, status))
 }
 
-async fn get_url_content(url: &str) -> Result<(String, reqwest::StatusCode), Box<dyn Error>> {
-    let content = reqwest::get(url).await?;
+async fn get_url_content(url: &str, client: &Client) -> Result<(String, reqwest::StatusCode), Box<dyn Error>> {
+    let content = client.get(url).send().await?;
     let status = content.status();
 
     Ok((content.text().await?, status))
 }
 
 
-async fn summarize(text: &str, verbose: bool,n_gen_limit: Option<u32>) -> Result<Response, Box<dyn Error>> {
-    let sys_prompt = std::fs::read_to_string("sysPrompt.txt")?;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = env::args().collect();
+    let subject = &args[1];
+    let verbose = args.len() > 2 && args[2] == "--verbose";
     let client = reqwest::Client::new();
 
-    let request = serde_json::json!({
-        "model": "summarizer3",
-        "prompt": format!("{sys_prompt}\n\nBEGIN ARTICLE HTML\n{text}\nEND ARTICLE HTML"),
-        "stream": verbose && false
-    });
+    let article_html = get_random_article(subject, verbose, &client).await;
+    let parsed_html = parse_html(&article_html);
+    let _ = std::fs::write("input", &parsed_html);
+    let summary = summarizer::summarize_stream(&parsed_html, Some(7000), &client).await?;
+    std::fs::write("output.md", summary)?;
 
-    let request = client
-        .post("http://localhost:11434/api/generate")
-        .json(&request)
-        .build()?;
-
-    let response = client.execute(request).await?;
-    Ok(response)
+    Ok(())
 }
