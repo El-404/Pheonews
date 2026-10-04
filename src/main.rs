@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let verbose = args.len() > 2 && args[2] == "--verbose";
 
     let article_html = fetcher::get_random_article(subject, verbose).await;
-    let summarized_response = summarizer::summarize(&fetcher::parse_html(&article_html)).await;
+    let summarized_response = summarizer::summarize(&fetcher::parse_html(&article_html), None).await;
 
     
     Ok(())
