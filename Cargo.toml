@@ -13,3 +13,4 @@ google-news-url-decoder-rs = { path = "./google-news-url-decoder-rs" }
 scraper = "0.27.0"
 serde_json = "1.0.151"
 serde = { version = "1.0.0", features = ["derive"] }
+rig = "0.43.0"
